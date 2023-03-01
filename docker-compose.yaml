@@ -1,0 +1,23 @@
+version: '3.9'
+
+services:
+  frontend:
+    build: services/frontenv
+    environment:
+      - BROKER_URL=amqp://user:password@broker:5672
+    depends_on:
+      - broker
+  computer-vision:
+    build: services/computer_vision/
+    environment:
+      - BROKER_URL=amqp://user:password@broker:5672
+    depends_on:
+      - broker
+  broker:
+    image: rabbitmq:3.10-alpine
+    ports:
+      - "5672:5672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=user
+      - RABBITMQ_DEFAULT_PASS=password
+
