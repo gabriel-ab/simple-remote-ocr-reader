@@ -101,7 +101,7 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
         tooltip: "Tirar Foto",
         child: const m.Icon(m.Icons.camera_alt),
       ),
-    ) : null;
+    ) : const m.Center(child: m.CircularProgressIndicator());
   }
 }
 
