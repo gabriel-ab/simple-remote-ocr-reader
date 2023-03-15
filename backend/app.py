@@ -34,7 +34,8 @@ def home():
           response_class=Response,
           responses={200: {'content': {'image/jpeg': {}}}})
 def preprocess(image: bytes = File()):
-    img = cv.imdecode(np.frombuffer(image, np.uint8), cv.IMREAD_GRAYSCALE)
+    img = np.frombuffer(image, np.uint8)
+    img = cv.imdecode(img, cv.IMREAD_GRAYSCALE)
     img = _preprocess(img)
     img_bytes = cv.imencode('.jpg', img)[1].tobytes()
     return Response(content=img_bytes, media_type="image/jpeg")

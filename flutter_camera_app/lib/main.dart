@@ -2,21 +2,21 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
-import 'package:http_parser/src/media_type.dart' as mt;
 import 'package:camera/camera.dart' as c;
 import 'package:flutter/material.dart' as m;
 
 
-Future<Uint8List> preprocess(Uint8List imageData) async {
-  var request = http.MultipartRequest('POST', Uri.parse('192.168.0.108:8000/preprocess'));
-  request.fields['title'] = 'MyImage';
 
-  var pic = http.MultipartFile.fromBytes('image', imageData, contentType: mt.MediaType('image', 'jpeg'));
-  request.files.add(pic);
+Future<Uint8List> preprocess(Uint8List jpegImage) async {
+  var request = http.MultipartRequest('POST', Uri.http('192.168.0.108:8000', '/preprocess'))
+    ..files.add(http.MultipartFile.fromBytes('image', jpegImage, filename: 'image.jpg'));
 
   var response = await request.send();
-  var data = await response.stream.toBytes();
-  return data;
+  if (response.statusCode == 200) {
+    return await response.stream.toBytes();
+  } else {
+    throw Exception("$response");
+  }
 }
 
 Future<void> main() async {
@@ -51,7 +51,7 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
   bool initialized = false;
 
   @override
-  void initState() async {
+  void initState() {
     super.initState();
     controller = c.CameraController(
       widget.camera,
@@ -78,11 +78,12 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
       floatingActionButton: m.FloatingActionButton(
         onPressed: () async {
           try {
-            final image = await controller.takePicture();
-            final processed = await preprocess(await image.readAsBytes());
-            await m.Navigator.of(context).push(
+            final imagePath = await controller.takePicture();
+            final processed = await preprocess(await imagePath.readAsBytes());
+            m.Navigator.of(context).push(
               m.MaterialPageRoute(
                 builder: (context) => DisplayPictureScreen(
+                  // image: m.Image.memory(i.encodeJpg(image)),
                   image: m.Image.memory(processed),
                   title: "Imagem Processada",
                 ),
@@ -91,8 +92,8 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
           } catch (e) {
             await m.Navigator.of(context).push(
               m.MaterialPageRoute(
-                builder: (context) => const m.Center(
-                  child: m.Text('Um erro inesperado ocorreu', style: m.TextStyle(color: m.Colors.green), textAlign: m.TextAlign.center,),
+                builder: (context) => m.Center(
+                  child: m.Text('$e', style: const m.TextStyle(color: m.Colors.green), textAlign: m.TextAlign.center, textScaleFactor: 0.2),
                 ),
               ),
             );
