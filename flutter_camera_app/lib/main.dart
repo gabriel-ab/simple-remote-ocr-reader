@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 import 'package:camera/camera.dart' as c;
 import 'package:flutter/material.dart' as m;
@@ -17,6 +18,16 @@ Future<Uint8List> preprocess(Uint8List jpegImage) async {
   } else {
     throw Exception("$response");
   }
+}
+
+Future<String> readImage(Uint8List jpegImage) async {
+  var request = http.MultipartRequest('POST', Uri.http('192.168.0.108:8000', '/read'))
+    ..files.add(http.MultipartFile.fromBytes('image', jpegImage, filename: 'image.jpg'));
+  final response = await request.send();
+  if (response.statusCode != 200) {
+    throw Exception("Bad Request");
+  }
+  return response.stream.bytesToString();
 }
 
 Future<void> main() async {
@@ -73,22 +84,74 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
   @override
   m.Widget build(m.BuildContext context) {
     return initialized ? m.Scaffold(
-      appBar: m.AppBar(title: const m.Text('Take a picture')),
+      appBar: m.AppBar(
+        title: const m.Text('Take a picture'),
+        actions: <Widget>[
+          m.ElevatedButton(
+            onPressed: () {
+              controller.setFlashMode(c.FlashMode.off);
+            },
+            style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
+            child: const Text(
+              "Flash Off",
+              style: TextStyle(
+                color: m.Colors.white,
+                backgroundColor: m.Colors.transparent
+              ),
+            ),
+          ),
+          // **For Flash ON**
+          m.ElevatedButton(
+            onPressed: () {
+              controller.setFlashMode(c.FlashMode.always);
+            },
+            style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
+            child: const Text(
+              "Flash On",
+              style: TextStyle(
+                  color: m.Colors.white, backgroundColor: m.Colors.transparent),
+            ),
+          ),
+          //**For AUTO Flash:**
+          m.ElevatedButton(
+            onPressed: () {
+              controller.setFlashMode(c.FlashMode.auto);
+            },
+            style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
+            child: const Text(
+              "Auto Flash",
+              style: TextStyle(
+                  color: m.Colors.white, backgroundColor: m.Colors.transparent),
+            ),
+          ),
+        ],
+      ),
       body: c.CameraPreview(controller),
       floatingActionButton: m.FloatingActionButton(
         onPressed: () async {
           try {
             final imagePath = await controller.takePicture();
-            final processed = await preprocess(await imagePath.readAsBytes());
-            m.Navigator.of(context).push(
+            final text = await readImage(await imagePath.readAsBytes());
+            await m.Navigator.of(context).push(
               m.MaterialPageRoute(
-                builder: (context) => DisplayPictureScreen(
-                  // image: m.Image.memory(i.encodeJpg(image)),
-                  image: m.Image.memory(processed),
-                  title: "Imagem Processada",
-                ),
-              ),
+                builder: (context) => m.Scaffold(
+                  appBar: m.AppBar(title: const m.Text("Texto Extraido"),),
+                  body: m.Center(
+                    child: m.Text(text, textScaleFactor: 2.0,),
+                  ),
+                )
+              )
             );
+            // final processed = await preprocess(await imagePath.readAsBytes());
+            // await m.Navigator.of(context).push(
+            //   m.MaterialPageRoute(
+            //     builder: (context) => DisplayPictureScreen(
+            //       // image: m.Image.memory(i.encodeJpg(image)),
+            //       image: m.Image.memory(processed),
+            //       title: "Imagem Processada",
+            //     ),
+            //   ),
+            // );
           } catch (e) {
             await m.Navigator.of(context).push(
               m.MaterialPageRoute(
