@@ -8,26 +8,16 @@ import 'package:flutter/material.dart' as m;
 
 
 
-Future<Uint8List> preprocess(Uint8List jpegImage) async {
-  var request = http.MultipartRequest('POST', Uri.http('192.168.0.108:8000', '/preprocess'))
+Future<http.ByteStream> request(Uint8List jpegImage, {String method = '/read'}) async {
+  var request = http.MultipartRequest('POST', Uri.http('192.168.0.108:8000', method))
     ..files.add(http.MultipartFile.fromBytes('image', jpegImage, filename: 'image.jpg'));
 
   var response = await request.send();
   if (response.statusCode == 200) {
-    return await response.stream.toBytes();
+    return response.stream;
   } else {
     throw Exception("$response");
   }
-}
-
-Future<String> readImage(Uint8List jpegImage) async {
-  var request = http.MultipartRequest('POST', Uri.http('192.168.0.108:8000', '/read'))
-    ..files.add(http.MultipartFile.fromBytes('image', jpegImage, filename: 'image.jpg'));
-  final response = await request.send();
-  if (response.statusCode != 200) {
-    throw Exception("Bad Request");
-  }
-  return response.stream.bytesToString();
 }
 
 Future<void> main() async {
@@ -92,37 +82,15 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
               controller.setFlashMode(c.FlashMode.off);
             },
             style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
-            child: const Text(
-              "Flash Off",
-              style: TextStyle(
-                color: m.Colors.white,
-                backgroundColor: m.Colors.transparent
-              ),
-            ),
-          ),
-          // **For Flash ON**
-          m.ElevatedButton(
-            onPressed: () {
-              controller.setFlashMode(c.FlashMode.always);
-            },
-            style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
-            child: const Text(
-              "Flash On",
-              style: TextStyle(
-                  color: m.Colors.white, backgroundColor: m.Colors.transparent),
-            ),
+            child: const m.Icon(m.Icons.flashlight_off),
           ),
           //**For AUTO Flash:**
           m.ElevatedButton(
             onPressed: () {
-              controller.setFlashMode(c.FlashMode.auto);
+              controller.setFlashMode(c.FlashMode.torch);
             },
             style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
-            child: const Text(
-              "Auto Flash",
-              style: TextStyle(
-                  color: m.Colors.white, backgroundColor: m.Colors.transparent),
-            ),
+            child: const m.Icon(m.Icons.flashlight_on),
           ),
         ],
       ),
@@ -131,29 +99,38 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
         onPressed: () async {
           try {
             final imagePath = await controller.takePicture();
-            final text = await readImage(await imagePath.readAsBytes());
-            await m.Navigator.of(context).push(
+            m.Navigator.of(context).push(
               m.MaterialPageRoute(
                 builder: (context) => m.Scaffold(
-                  appBar: m.AppBar(title: const m.Text("Texto Extraido"),),
-                  body: m.Center(
-                    child: m.Text(text, textScaleFactor: 2.0,),
-                  ),
+                  appBar: m.AppBar(title: const m.Text('Processando')),
+                  body: const m.Center(child: m.CircularProgressIndicator()),
                 )
-              )
+              ),
             );
-            // final processed = await preprocess(await imagePath.readAsBytes());
+            // final text = (await request(await imagePath.readAsBytes(), method: '/read')).bytesToString();
+            // final image = await request(await imagePath.readAsBytes(), method: '/preprocess');
+            final image = await (await request(await imagePath.readAsBytes(), method: '/threshold')).toBytes();
+
             // await m.Navigator.of(context).push(
             //   m.MaterialPageRoute(
-            //     builder: (context) => DisplayPictureScreen(
-            //       // image: m.Image.memory(i.encodeJpg(image)),
-            //       image: m.Image.memory(processed),
-            //       title: "Imagem Processada",
-            //     ),
-            //   ),
+            //     builder: (context) => m.Scaffold(
+            //       appBar: m.AppBar(title: const m.Text("Texto Extraido"),),
+            //       body: m.Center(
+            //         child: m.Text(text, textScaleFactor: 2.0,),
+            //       ),
+            //     )
+            //   )
             // );
+            await m.Navigator.of(context).pushReplacement(
+              m.MaterialPageRoute(
+                builder: (context) => DisplayPictureScreen(
+                  image: m.Image.memory(image),
+                  title: "Imagem Processada",
+                ),
+              ),
+            );
           } catch (e) {
-            await m.Navigator.of(context).push(
+            await m.Navigator.of(context).pushReplacement(
               m.MaterialPageRoute(
                 builder: (context) => m.Center(
                   child: m.Text('$e', style: const m.TextStyle(color: m.Colors.green), textAlign: m.TextAlign.center, textScaleFactor: 0.2),
