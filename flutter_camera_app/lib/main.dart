@@ -20,6 +20,11 @@ Future<http.ByteStream> request(Uint8List jpegImage, {String method = '/read'}) 
   }
 }
 
+Future<http.ByteStream> takePictureAndRequest(c.CameraController controller, {String method = '/read'}) async {
+  final imagePath = await controller.takePicture();
+  return request(await imagePath.readAsBytes(), method: method);
+}
+
 Future<void> main() async {
   m.WidgetsFlutterBinding.ensureInitialized();
   final cameras = await c.availableCameras();
@@ -77,6 +82,18 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
       appBar: m.AppBar(
         title: const m.Text('Take a picture'),
         actions: <Widget>[
+          
+          m.Tooltip(
+            message: 'Foco Automático',
+            child: m.ElevatedButton(
+              onPressed: () async {
+                  await controller.setFocusMode(c.FocusMode.auto);
+                  await controller.setFocusMode(c.FocusMode.locked);
+              },
+              style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
+              child: const m.Icon(m.Icons.center_focus_strong),
+            ),
+          ),
           m.ElevatedButton(
             onPressed: () {
               controller.setFlashMode(c.FlashMode.off);
@@ -84,7 +101,6 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
             style: m.ElevatedButton.styleFrom(backgroundColor: m.Colors.transparent),
             child: const m.Icon(m.Icons.flashlight_off),
           ),
-          //**For AUTO Flash:**
           m.ElevatedButton(
             onPressed: () {
               controller.setFlashMode(c.FlashMode.torch);
@@ -94,55 +110,102 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
           ),
         ],
       ),
-      body: c.CameraPreview(controller),
-      floatingActionButton: m.FloatingActionButton(
-        onPressed: () async {
-          try {
-            final imagePath = await controller.takePicture();
-            m.Navigator.of(context).push(
-              m.MaterialPageRoute(
-                builder: (context) => m.Scaffold(
-                  appBar: m.AppBar(title: const m.Text('Processando')),
-                  body: const m.Center(child: m.CircularProgressIndicator()),
-                )
-              ),
-            );
-            // final text = (await request(await imagePath.readAsBytes(), method: '/read')).bytesToString();
-            // final image = await request(await imagePath.readAsBytes(), method: '/preprocess');
-            final image = await (await request(await imagePath.readAsBytes(), method: '/threshold')).toBytes();
+      body: Column(
+        children: [
+          c.CameraPreview(controller),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              m.FloatingActionButton(
+                onPressed: () async {
+                  controller.setFlashMode(c.FlashMode.off);
+                  m.Navigator.of(context).push(m.MaterialPageRoute(builder: (context) => const ProcessingScreen(text: 'Lendo o texto...')));
 
-            // await m.Navigator.of(context).push(
-            //   m.MaterialPageRoute(
-            //     builder: (context) => m.Scaffold(
-            //       appBar: m.AppBar(title: const m.Text("Texto Extraido"),),
-            //       body: m.Center(
-            //         child: m.Text(text, textScaleFactor: 2.0,),
-            //       ),
-            //     )
-            //   )
-            // );
-            await m.Navigator.of(context).pushReplacement(
-              m.MaterialPageRoute(
-                builder: (context) => DisplayPictureScreen(
-                  image: m.Image.memory(image),
-                  title: "Imagem Processada",
-                ),
+                  try {
+                    final text = await (await takePictureAndRequest(controller, method: '/read')).bytesToString();
+                    
+                    if (!mounted) return;
+                    await m.Navigator.of(context).pushReplacement(
+                      m.MaterialPageRoute(
+                        builder: (context) => ExtractedTextScreen(text: text)
+                      )
+                    );
+                  } on Exception {
+                    m.Navigator.of(context).pop();
+                  }
+                    
+                },
+                tooltip: "Ler Texto",
+                heroTag: 'read',
+                child: const m.Icon(m.Icons.camera_alt),
               ),
-            );
-          } catch (e) {
-            await m.Navigator.of(context).pushReplacement(
-              m.MaterialPageRoute(
-                builder: (context) => m.Center(
-                  child: m.Text('$e', style: const m.TextStyle(color: m.Colors.green), textAlign: m.TextAlign.center, textScaleFactor: 0.2),
-                ),
+              m.FloatingActionButton(
+                onPressed: () async {
+                  m.Navigator.of(context).push(m.MaterialPageRoute(builder: (context) => const ProcessingScreen(text: 'Lendo e desenhando detecções...')));
+                  try {
+                    final image = await (await takePictureAndRequest(controller, method: '/draw')).toBytes();
+                    if (!mounted) return;
+                    m.Navigator.of(context).pushReplacement(
+                      m.MaterialPageRoute(
+                        builder: (context) => DisplayPictureScreen(
+                          title: "Textos encontrados",
+                          image: m.Image.memory(image),
+                        ),
+                      ),
+                    );
+                  } on Exception {
+                    m.Navigator.of(context).pop();
+                  }
+                },
+                tooltip: 'Desenhar detecções',
+                heroTag: 'draw',
+                child: const m.Icon(m.Icons.draw),
               ),
-            );
-          }
-        },
-        tooltip: "Tirar Foto",
-        child: const m.Icon(m.Icons.camera_alt),
+            ],
+          ),
+        ],
       ),
-    ) : const m.Center(child: m.CircularProgressIndicator());
+    ) : const ProcessingScreen(text: 'Carregando');
+  }
+}
+
+class ProcessingScreen extends m.StatelessWidget {
+  final String text;
+  const ProcessingScreen({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return m.Scaffold(
+      appBar: m.AppBar(title: m.Text(text)),
+      body: const m.Center(child: m.CircularProgressIndicator()),
+    );
+  }
+}
+
+class ExtractedTextScreen extends m.StatelessWidget {
+  final String text;
+  const ExtractedTextScreen({super.key, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return m.Scaffold(
+      appBar: m.AppBar(title: const m.Text("Texto Extraido"),),
+      body: m.Center(
+        child: m.Text(text, textScaleFactor: 2.0,),
+      ),
+    );
+  }
+}
+
+class ErrorScreen extends m.StatelessWidget {
+  final String error;
+  const ErrorScreen({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return m.Center(
+      child: m.Text(error, style: const m.TextStyle(color: m.Colors.green), textAlign: m.TextAlign.center, textScaleFactor: 0.2),
+    );
   }
 }
 
