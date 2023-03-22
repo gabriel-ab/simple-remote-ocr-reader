@@ -71,4 +71,5 @@ __pypackages__/
 # End of https://www.toptal.com/developers/gitignore/api/pythonvanilla
 
 .vscode/
-backend/ai-models/
+craft_mlt_25k.pth
+latin_g2.pth
