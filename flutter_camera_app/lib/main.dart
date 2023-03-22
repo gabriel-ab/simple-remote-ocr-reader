@@ -154,8 +154,7 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
                   m.Navigator.of(context).push(m.MaterialPageRoute(builder: (context) => const ProcessingScreen(text: 'Lendo o texto...')));
                   try {
                     final text = await (await takePictureAndRequest(controller, '${textController.text}/read')).bytesToString();
-                    
-                    // if (!mounted) return;
+                    if (!mounted) return;
                     await m.Navigator.of(context).pushReplacement(
                       m.MaterialPageRoute(
                         builder: (context) => ExtractedTextScreen(text: text)
@@ -172,6 +171,7 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
               ),
               m.FloatingActionButton(
                 onPressed: () async {
+                  controller.setFlashMode(c.FlashMode.off);
                   m.Navigator.of(context).push(m.MaterialPageRoute(builder: (context) => const ProcessingScreen(text: 'Lendo e desenhando detecções...')));
                   try {
                     final image = await (await takePictureAndRequest(controller, '${textController.text}/draw')).toBytes();
