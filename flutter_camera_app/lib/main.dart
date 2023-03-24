@@ -52,7 +52,7 @@ class TakePictureScreen extends m.StatefulWidget {
   
 }
 
-class TakePictureScreenState extends m.State<TakePictureScreen> {
+class TakePictureScreenState extends m.State<TakePictureScreen> with WidgetsBindingObserver {
   late c.CameraController controller;
   late m.TextEditingController textController;
   bool initialized = false;
@@ -60,16 +60,12 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
   @override
   void initState() {
     super.initState();
+    textController = m.TextEditingController(text: 'https://easyocr-reader-bjydhagpna-rj.a.run.app');
     controller = c.CameraController(
       widget.camera,
       c.ResolutionPreset.high,
     );
-    controller.initialize().then((value) {
-      if (!mounted) return;
-      initialized = true;
-      setState(() {});
-    });
-    textController = m.TextEditingController(text: 'http://192.168.0.108:8000');
+    initCamera();
   }
 
   @override
@@ -77,6 +73,22 @@ class TakePictureScreenState extends m.State<TakePictureScreen> {
     textController.dispose();
     controller.dispose();
     super.dispose();
+  }
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      setState(() {initialized = false;});
+      initCamera();
+    } else if (state == AppLifecycleState.paused) {
+      controller.dispose();
+    }
+  }
+  void initCamera() {
+    controller.initialize().then((value) {
+      if (!mounted) return;
+      initialized = true;
+      setState(() {});
+    });
   }
 
   Future<String?> openDialog() => m.showDialog<String>(
